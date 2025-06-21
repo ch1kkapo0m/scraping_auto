@@ -3,13 +3,17 @@ from datetime import datetime
 import subprocess
 from pytz import timezone
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 sched = BlockingScheduler(timezone=timezone('Europe/Kyiv'))
 
-PARSER_HOUR = 12
-PARSER_MINUTE = 00
-DUMP_HOUR = 12
-DUMP_MINUTE = 00
+SCRAPE_TIME = os.getenv('SCRAPE_TIME', '12:00')
+DUMP_TIME = os.getenv('DUMP_TIME', '12:00')
+
+PARSER_HOUR, PARSER_MINUTE = map(int, SCRAPE_TIME.split(':'))
+DUMP_HOUR, DUMP_MINUTE = map(int, DUMP_TIME.split(':'))
 
 @sched.scheduled_job('cron', hour=PARSER_HOUR, minute=PARSER_MINUTE)
 def run_parser():
@@ -24,11 +28,11 @@ def dump_db():
     dump_file = os.path.join(dumps_dir, f"dump_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql")
     result = subprocess.run([
         "pg_dump",
-        "-h", "db",
-        "-U", "postgres",
-        "-d", "autoria",
+        "-h", os.getenv('DB_HOST', 'db'),
+        "-U", os.getenv('DB_USER', 'postgres'),
+        "-d", os.getenv('DB_NAME', 'autoria'),
         "-f", dump_file
-    ], env={**os.environ, "PGPASSWORD": "postgres"})
+    ], env={**os.environ, "PGPASSWORD": os.getenv('DB_PASSWORD', 'postgres')})
     if result.returncode == 0:
         print(f"Дамп збережено: {dump_file}")
     else:

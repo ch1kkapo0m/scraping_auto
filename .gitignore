@@ -71,7 +71,6 @@ pgdata/
 
 # Env
 .env
-.env.*
 
 # Dumps
 /dumps/
