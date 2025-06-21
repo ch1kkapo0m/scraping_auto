@@ -1,0 +1,5 @@
+aiohttp
+asyncpg
+python-dotenv
+apscheduler
+beautifulsoup4

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: autoria
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./dumps:/dumps
+    ports:
+          - "5432:5432" 
+  app:
+    build: .
+    restart: always
+    env_file: .env
+    depends_on:
+      - db
+    volumes:
+      - ./dumps:/app/dumps
+    command: ["python", "app/scheduler.py"]
+
+volumes:
+  pgdata:
