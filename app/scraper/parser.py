@@ -103,7 +103,7 @@ async def parse_car_card(session, url: str) -> dict:
     def get_images_count(soup):
         count_span = soup.select_one('span.count span.mhide')
         if count_span:
-            text = count_span.text.strip()  # "з 53"
+            text = count_span.text.strip() 
             digits = ''.join(filter(str.isdigit, text))
             if digits:
                 return int(digits)
@@ -120,19 +120,16 @@ async def parse_car_card(session, url: str) -> dict:
         return None
 
     def get_car_vin(soup):
-        # 1. span.label-vin
         vin_span = soup.select_one('span.label-vin')
         if vin_span:
             vin_text = ''.join(vin_span.find_all(string=True, recursive=False)).strip()
             if vin_text:
                 return vin_text
-        # 2. span.vin-code
         vin_code_span = soup.select_one('span.vin-code')
         if vin_code_span:
             vin_text = vin_code_span.text.strip()
             if vin_text:
                 return vin_text
-        # 3. інші можливі варіанти (можна додати ще селектори за потреби)
         return None
 
     def get_car_id(soup):
@@ -161,7 +158,6 @@ async def parse_car_card(session, url: str) -> dict:
             data_expires = None
     
     phone_number = await fetch_phone_number(session, car_id, data_hash, data_expires)
-    print(phone_number)
     phone_number = int('38' + phone_number.replace('(', '').replace(')', '').replace('-', '').replace(' ', '')) if phone_number else None
 
     title = safe_text('h1.head')
@@ -173,19 +169,6 @@ async def parse_car_card(session, url: str) -> dict:
     car_vin = get_car_vin(soup)
     datetime_found = datetime.now()
 
-    print({
-        'url': url,
-        'title': title,
-        'price_usd': price_usd,
-        'odometer': odometer,
-        'username': username,
-        'phone_number': phone_number,
-        'image_url': image_url,
-        'images_count': images_count,
-        'car_number': car_number,
-        'car_vin': car_vin,
-        'datetime_found': datetime_found,
-    })
 
     return {
         'url': url,
@@ -283,14 +266,13 @@ async def main():
         semaphore = asyncio.Semaphore(10)
 
         while True:
-            print(f"🔍 Обробляємо сторінку: {page}")
+            print(f"Обробляємо сторінку: {page}")
             car_links, has_more = await extract_car_links(session, page)
 
             if not car_links:
-                print(f"🚫 Сторінка {page}: більше немає авто, зупинка.")
+                print(f"Сторінка {page}: більше немає авто, зупинка.")
                 break
 
-            # --- Фільтруємо тільки ті лінки, яких ще нема в БД ---
             existing_urls = await get_existing_urls(pool, car_links)
             new_links = [link for link in car_links if link not in existing_urls]
 
@@ -298,7 +280,7 @@ async def main():
 
             if not new_links:
                 print(f"На сторінці {page} всі авто вже є в БД, переходимо далі.")
-            
+
             async def parse_and_save(link):
                 async with semaphore:
                     try:
@@ -308,6 +290,8 @@ async def main():
                     except Exception as e:
                         print(f"Помилка при обробці {link}: {e}")
 
+            max_workers = 30
+            semaphore = asyncio.Semaphore(max_workers)
             tasks = [asyncio.create_task(parse_and_save(link)) for link in new_links]
             await asyncio.gather(*tasks)
 
