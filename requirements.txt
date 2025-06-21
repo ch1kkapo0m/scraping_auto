@@ -3,3 +3,4 @@ asyncpg
 python-dotenv
 apscheduler
 beautifulsoup4
+pytz

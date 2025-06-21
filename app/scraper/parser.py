@@ -6,13 +6,15 @@ from datetime import datetime
 
 print("Старт парсера", flush=True)
 
-phone_semaphore = asyncio.Semaphore(2)  
+phone_semaphore = asyncio.Semaphore(1)  
 
-async def fetch_phone_number(session, car_number, data_hash, data_expires, retries=3):
-    if not (car_number and data_hash and data_expires):
+async def fetch_phone_number(session, car_id, data_hash, data_expires, retries=3):
+    if not car_id or not data_hash or not data_expires:
+        print("Недостатньо даних для отримання телефону.")
         return None
 
-    phone_api_url = f'https://auto.ria.com/users/phones/{car_number}?hash={data_hash}&expires={data_expires}'
+    phone_api_url = f'https://auto.ria.com/users/phones/{car_id}?hash={data_hash}&expires={data_expires}'
+    print(f"[DEBUG] Запит телефону: {phone_api_url}")
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Accept": "application/json, text/plain, */*",
@@ -21,7 +23,7 @@ async def fetch_phone_number(session, car_number, data_hash, data_expires, retri
     async with phone_semaphore:  
         for attempt in range(retries):
             try:
-                await asyncio.sleep(2) 
+                await asyncio.sleep(1) 
                 async with session.get(phone_api_url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -36,7 +38,7 @@ async def fetch_phone_number(session, car_number, data_hash, data_expires, retri
                 print(f"Таймаут при отриманні телефону, спроба {attempt+1}")
             except Exception as e:
                 print(f"Інша помилка при отриманні телефону: {e}")
-            await asyncio.sleep(2)  
+            await asyncio.sleep(1)  
 
     return None
 
@@ -84,6 +86,12 @@ async def parse_car_card(session, url: str) -> dict:
         a_tag = soup.select_one('h4.seller_info_name a')
         if a_tag:
             return a_tag.text.strip()
+        a_tag2 = soup.select_one('div.seller_info_name a')
+        if a_tag2:
+            return a_tag2.text.strip()
+        div_tag = soup.select_one('div.seller_info_name')
+        if div_tag:
+            return div_tag.text.strip()
         return None
 
     def parse_first_image_url(soup):
@@ -112,23 +120,48 @@ async def parse_car_card(session, url: str) -> dict:
         return None
 
     def get_car_vin(soup):
+        # 1. span.label-vin
         vin_span = soup.select_one('span.label-vin')
         if vin_span:
             vin_text = ''.join(vin_span.find_all(string=True, recursive=False)).strip()
-            return vin_text
+            if vin_text:
+                return vin_text
+        # 2. span.vin-code
+        vin_code_span = soup.select_one('span.vin-code')
+        if vin_code_span:
+            vin_text = vin_code_span.text.strip()
+            if vin_text:
+                return vin_text
+        # 3. інші можливі варіанти (можна додати ще селектори за потреби)
+        return None
+
+    def get_car_id(soup):
+        for li in soup.find_all('li', class_='item grey'):
+            if li.text.strip().startswith('ID авто'):
+                span = li.find('span', class_='bold')
+                if span:
+                    print(f"ID авто: {span.text.strip()}")
+                    return span.text.strip()
         return None
 
     car_number = get_car_number(soup)
+    car_id = get_car_id(soup)
 
     script_tag = soup.find('script', attrs={'data-hash': True, 'data-expires': True})
     if script_tag:
-        data_hash = script_tag['data-hash']
-        data_expires = script_tag['data-expires']
+        data_hash = script_tag.get('data-hash')
+        data_expires = script_tag.get('data-expires')
     else:
-        data_hash = None
-        data_expires = None
+        script_tag = soup.find('script', lambda attr: attr and 'data-hash' in attr and 'data-expires' in attr)
+        if script_tag:
+            data_hash = script_tag.get('data-hash')
+            data_expires = script_tag.get('data-expires')
+        else:
+            data_hash = None
+            data_expires = None
     
-    phone_number = await fetch_phone_number(session, car_number, data_hash, data_expires)
+    phone_number = await fetch_phone_number(session, car_id, data_hash, data_expires)
+    print(phone_number)
     phone_number = int('38' + phone_number.replace('(', '').replace(')', '').replace('-', '').replace(' ', '')) if phone_number else None
 
     title = safe_text('h1.head')
@@ -189,7 +222,12 @@ async def extract_car_links(session, page):
         has_more = len(car_links) == 100
         return car_links, has_more
 
-
+async def get_existing_urls(pool, urls):
+    if not urls:
+        return set()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT url FROM cars WHERE url = ANY($1)", urls)
+        return set(row['url'] for row in rows)
 
 async def save_to_db(pool, car_data):
     phone_number = car_data.get('phone_number')
@@ -252,25 +290,30 @@ async def main():
                 print(f"🚫 Сторінка {page}: більше немає авто, зупинка.")
                 break
 
-            print(f"✅ Сторінка {page}: знайдено {len(car_links)} авто")
+            # --- Фільтруємо тільки ті лінки, яких ще нема в БД ---
+            existing_urls = await get_existing_urls(pool, car_links)
+            new_links = [link for link in car_links if link not in existing_urls]
 
+            print(f"Сторінка {page}: знайдено {len(car_links)} авто, нових до парсингу: {len(new_links)}")
+
+            if not new_links:
+                print(f"На сторінці {page} всі авто вже є в БД, переходимо далі.")
+            
             async def parse_and_save(link):
                 async with semaphore:
                     try:
                         data = await parse_car_card(session, link)
                         await save_to_db(pool, data)
-                        print(f"💾 Збережено: {link}")
+                        print(f"Збережено: {link}")
                     except Exception as e:
-                        print(f"⚠️ Помилка при обробці {link}: {e}")
+                        print(f"Помилка при обробці {link}: {e}")
 
-            tasks = [asyncio.create_task(parse_and_save(link)) for link in car_links]
+            tasks = [asyncio.create_task(parse_and_save(link)) for link in new_links]
             await asyncio.gather(*tasks)
 
             if not has_more:
-                print("✅ Усі сторінки оброблено.")
+                print("Усі сторінки оброблено.")
                 break
-            else:
-                return
 
             page += 1
 
