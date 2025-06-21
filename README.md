@@ -8,7 +8,7 @@
 
 ### 1. Клонувати репозиторій
 ```sh
-git clone <your-repo-url>
+git clone https://github.com/ch1kkapo0m/scraping_auto.git
 cd scraping_auto
 ```
 
