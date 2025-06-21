@@ -13,7 +13,7 @@ DUMP_MINUTE = 00
 
 @sched.scheduled_job('cron', hour=PARSER_HOUR, minute=PARSER_MINUTE)
 def run_parser():
-    print(f"[{datetime.now()}] Запуск парсера 🚗")
+    print(f"[{datetime.now()}] Запуск парсера")
     subprocess.run(["python", "app/scraper/parser.py"])
 
 @sched.scheduled_job('cron', hour=DUMP_HOUR, minute=DUMP_MINUTE)
