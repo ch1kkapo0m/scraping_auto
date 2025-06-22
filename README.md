@@ -22,7 +22,8 @@ cp .env.example .env
 ### 3. Встановити Docker та Docker Compose
 - [Docker Desktop для Windows/Mac](https://www.docker.com/products/docker-desktop/)
 - Для Linux: встановіть docker та docker-compose через пакетний менеджер
-Запустіть Docker - без запуску Docker проект не запуститься!
+
+## Запустіть Docker - без запуску Docker проект не запуститься!
 
 ### 4. Запустити проект через Docker Compose
 ```sh
