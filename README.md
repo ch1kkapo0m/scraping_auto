@@ -33,10 +33,12 @@ docker compose up --build -d
 
 ### 5. Перевірити БД через pgAdmin (опціонально)
 - Host: localhost
-- Port: 5432
+- Port: 5433  # <--- саме цей порт відкритий для підключення ззовні
 - User: postgres
 - Password: postgres
 - Database: autoria
+
+> **Примітка:** У docker-compose.yml порт 5432 контейнера прокинуто на 5433 хост, щоб ви могли підключатися до БД через pgAdmin або інший клієнт, не конфліктуючи з локальним Postgres.
 
 ### 6. Ручний запуск парсера (опціонально)
 ```sh
