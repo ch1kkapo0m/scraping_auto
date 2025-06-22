@@ -23,33 +23,28 @@ cp .env.example .env
 - [Docker Desktop для Windows/Mac](https://www.docker.com/products/docker-desktop/)
 - Для Linux: встановіть docker та docker-compose через пакетний менеджер
 
-## Запустіть Docker - без запуску Docker проект не запуститься!
-
 ### 4. Запустити проект через Docker Compose
 ```sh
 docker compose up --build -d
 ```
-- Піднімається база PostgreSQL та контейнер з парсером і scheduler.
+- База PostgreSQL та контейнер app піднімуться автоматично.
+- **Таблиці у БД створюються автоматично при старті контейнера app!**
+- Якщо база ще не готова, create_tables.py спробує підключитися кілька разів (є retry-логіка).
 
-### 5. Створити таблиці у БД (один раз)
-```sh
-docker compose exec app python app/create_tables.py
-```
-
-### 6. Перевірити БД через pgAdmin (опціонально)
+### 5. Перевірити БД через pgAdmin (опціонально)
 - Host: localhost
 - Port: 5432
 - User: postgres
 - Password: postgres
 - Database: autoria
 
-### 7. Ручний запуск парсера (опціонально)
+### 6. Ручний запуск парсера (опціонально)
 ```sh
 docker compose exec app python app/scraper/parser.py
 ```
 - Парсер збере всі нові оголошення та збереже їх у БД.
 
-### 8. Автоматичний запуск парсера і дампу
+### 7. Автоматичний запуск парсера і дампу
 - Парсер і дамп БД автоматично запускаються у час, вказаний у `.env` (SCRAPE_TIME, DUMP_TIME).
 - Scheduler запускається автоматично як основний процес контейнера app (див. Dockerfile).
 - Якщо scheduler не стартує автоматично, запустіть вручну:
@@ -63,7 +58,7 @@ docker compose exec app python app/scheduler.py
 ## Структура проекту
 - `app/scraper/parser.py` — основний парсер
 - `app/scheduler.py` — запуск парсера і дампу за розкладом
-- `app/create_tables.py` — створення таблиць у БД
+- `app/create_tables.py` — створення таблиць у БД (автоматично)
 - `app/models.py` — структура даних
 - `docker-compose.yml` — налаштування сервісів
 - `requirements.txt` — залежності Python
@@ -73,6 +68,7 @@ docker compose exec app python app/scheduler.py
 ---
 
 ## Важливі моменти
+- Таблиці у БД створюються автоматично при старті контейнера app.
 - Парсер не парсить оголошення, які вже є у БД.
 - Для отримання телефону використовується car_id (ID авто).
 - VIN-код та username парсяться з різних варіантів розмітки.

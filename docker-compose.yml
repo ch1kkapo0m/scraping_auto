@@ -21,7 +21,7 @@ services:
       - db
     volumes:
       - ./dumps:/app/dumps
-    command: ["python", "app/scheduler.py"]
+    command: ["/bin/sh", "-c", "python app/create_tables.py && python app/scheduler.py"]
 
 volumes:
   pgdata:
