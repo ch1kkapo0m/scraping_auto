@@ -202,7 +202,7 @@ async def extract_car_links(session, page):
             if href.startswith('https://auto.ria.com/uk/auto_') and href.endswith('.html'):
                 car_links.append(href)
 
-        has_more = len(car_links) == 100
+        has_more = len(car_links) >= 1
         return car_links, has_more
 
 async def get_existing_urls(pool, urls):
