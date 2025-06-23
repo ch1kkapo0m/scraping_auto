@@ -221,7 +221,6 @@ async def save_to_db(pool, car_data):
         except Exception:
             phone_number = None  
 
-    
     async with pool.acquire() as conn:
         try:
             await conn.execute("""
@@ -229,8 +228,7 @@ async def save_to_db(pool, car_data):
                     url, title, price_usd, odometer, username, phone_number, 
                     image_url, images_count, car_number, car_vin, datetime_found
                 ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-                ON CONFLICT (url) DO UPDATE SET
-                    phone_number = CASE WHEN cars.phone_number IS NULL OR cars.phone_number = 0 THEN EXCLUDED.phone_number ELSE cars.phone_number END
+                ON CONFLICT (url) DO NOTHING
             """,
             car_data.get('url'),
             car_data.get('title'),
