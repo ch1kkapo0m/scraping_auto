@@ -4,6 +4,14 @@ import subprocess
 from pytz import timezone
 import os
 from dotenv import load_dotenv
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -17,12 +25,12 @@ DUMP_HOUR, DUMP_MINUTE = map(int, DUMP_TIME.split(':'))
 
 @sched.scheduled_job('cron', hour=PARSER_HOUR, minute=PARSER_MINUTE)
 def run_parser():
-    print(f"[{datetime.now()}] Запуск парсера")
+    logger.info(f"Starting parser...")
     subprocess.run(["python", "app/scraper/parser.py"])
 
 @sched.scheduled_job('cron', hour=DUMP_HOUR, minute=DUMP_MINUTE)
 def dump_db():
-    print(f"[{datetime.now()}] Дамп бази даних...")
+    logger.info("Starting database dump...")
     dumps_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dumps')
     os.makedirs(dumps_dir, exist_ok=True)
     dump_file = os.path.join(dumps_dir, f"dump_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql")
@@ -34,9 +42,9 @@ def dump_db():
         "-f", dump_file
     ], env={**os.environ, "PGPASSWORD": os.getenv('DB_PASSWORD', 'postgres')})
     if result.returncode == 0:
-        print(f"Дамп збережено: {dump_file}")
+        logger.info(f"Database dump saved: {dump_file}")
     else:
-        print(f"Помилка дампу! Код: {result.returncode}")
+        logger.error(f"Database dump failed! Code: {result.returncode}")
 
 if __name__ == "__main__":
     sched.start()
